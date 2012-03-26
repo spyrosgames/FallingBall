@@ -129,22 +129,32 @@ function Main()
      openfeint.init("vEIQcyk6tNGeHGrJLFFA", "WAQEekVOmhYJOLewycV9aaBtiiocikAj57MM4SpDe4", "Falling Ball")
 end
 
-function addTitleView()
-     firstLevelBackground = display.newImage("FirstLevelBackground.png")
-
+function addMoon()
      moon = display.newImage("Moon.png")
      moon.x = 180
      moon.y = 60
+end
 
+function  addCloud()
      cloud = display.newImage("Clouds.png")
      cloud.x = display.contentWidth
      cloud.y = 270
+end
 
+function addWind()
      wind = display.newImage("Wind.png")
      wind.x = 0
      wind.y = 130
+end
 
-     local background = sprite.newSprite(backgroundSpriteSheet)
+function addTitleView()
+     firstLevelBackground = display.newImage("FirstLevelBackground.png")
+
+     addMoon()
+     addCloud()
+     addWind()
+
+     background = sprite.newSprite(backgroundSpriteSheet)
      background:prepare("running")
      --background:play()
      background.x = 160
@@ -480,12 +490,18 @@ function  resetButtonEffect()
           physics.start()
           moveSpeed = beforePauseMoveSpeed
      end
-     timer.cancel(blockTimer)
-     timer.cancel(liveTimer)
-     timer.cancel(ghostBallPowerupTimer)
-     timer.cancel(checkForGhostBallPowerupTimer)
-     ball:removeEventListener("collision", collisionHandler)
 
+     display.remove(blocks)
+     display.remove(ball)
+     display.remove(live)
+     display.remove(ghostBall)
+
+     cloud.x = display.contentWidth
+     wind.x = 0
+     
+     live = nil
+     ghostBall = nil
+     --
      score = 0
      scoreTF.text = score
 
@@ -493,16 +509,16 @@ function  resetButtonEffect()
      livesTF.text = "x" .. lives
 
      moveSpeed = 2
-
-     live = nil
-     ghostBall = nil
-
-     --ball.y = ball.height
-     display.remove(blocks)
-     display.remove(ball)
-     display.remove(live)
-     display.remove(ghostBall)
-
+     --
+     --remove Listeners
+     Runtime:removeEventListener("enterFrame", update)
+     timer.cancel(blockTimer)
+     timer.cancel(liveTimer)
+     timer.cancel(ghostBallPowerupTimer)
+     timer.cancel(checkForGhostBallPowerupTimer)
+     ball:removeEventListener("collision", collisionHandler)
+     --
+     --add Initial Blocks
      blocks = display.newGroup()
 
      for i = 1, 3 do
@@ -516,13 +532,17 @@ function  resetButtonEffect()
 
           blocks:insert(InitialBlock)
      end
-
-
+     --
+     --add Ball
      ball = display.newImage("Ball.png")
      ball.x = (display.contentWidth * 0.5)
      ball.y = ball.height
      ball:setReferencePoint(display.CenterReferencePoint)
      ball.isBullet = true
+     --
+
+     --add gameListeners
+     Runtime:addEventListener("enterFrame", update)
 
      blockTimer = timer.performWithDelay(1000, addBlock, 0)
      liveTimer = timer.performWithDelay(10000, addLivePowerup, 0)
@@ -530,10 +550,67 @@ function  resetButtonEffect()
      checkForGhostBallPowerupTimer = timer.performWithDelay(10000, ghostBallPowerupEffect, 0)
 
      ball:addEventListener("collision", collisionHandler)
+     --
+end
 
-     addBlock()
-     --addInitialBlocks(3)
-     --display.remove(block)
+function showAlertPlayAgainIcon()
+     if(paused == true) then
+          pauseButton("PauseButton.png")
+
+          paused = false
+          physics.start()
+          moveSpeed = beforePauseMoveSpeed
+     end
+
+     display.remove(blocks)
+     display.remove(ball)
+     display.remove(live)
+     display.remove(ghostBall)
+     display.remove(alert)
+     display.remove(alertScore)
+     display.remove(playAgainIcon)
+     display.remove(facebookIcon)
+     display.remove(backToMainMenuIcon)
+
+     cloud.x = display.contentWidth
+     wind.x = 0
+     
+     live = nil
+     ghostBall = nil
+     --
+     score = 0
+     scoreTF.text = score
+
+     lives = 3
+     livesTF.text = "x" .. lives
+
+     moveSpeed = 2
+
+     resetButton()
+
+     --add Initial Blocks
+     blocks = display.newGroup()
+
+     for i = 1, 3 do
+          local InitialBlock = display.newImage("Block_new.png")
+
+          InitialBlock.x = math.floor(math.random() * (display.contentWidth - InitialBlock.width))
+          InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
+
+          physics.addBody(InitialBlock, {denisty = blockDenisty, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          InitialBlock.bodyType = "static"
+
+          blocks:insert(InitialBlock)
+     end
+     --
+     --add Ball
+     ball = display.newImage("Ball.png")
+     ball.x = (display.contentWidth * 0.5)
+     ball.y = ball.height
+     ball:setReferencePoint(display.CenterReferencePoint)
+     ball.isBullet = true
+     --
+     gameListeners("add")
 
 end
 
@@ -544,6 +621,7 @@ function showAlert()
 
      alertScore = display.newText(scoreTF.text .. "!", 134, 240, native.systemFontBold, 30)
      livesTF.text = ""
+
      display.remove(ball)
      display.remove(live)
      display.remove(ghostBall)
@@ -563,18 +641,28 @@ function showAlert()
 end
 
 function backToMainMenu()
-     addTitleView()
-end
+     scoreTF.text = ""
+     paused = false
+     display.remove(blocks)
+     display.remove(alert)
+     display.remove(pauseButtonUI)
+     display.remove(playAgainIcon)
+     display.remove(facebookIcon)
+     display.remove(backToMainMenuIcon)
+     display.remove(livesTF)
+     display.remove(scoreTF)
+     display.remove(firstLevelBackground)
+     display.remove(cloud)
+     display.remove(wind)
+     display.remove(moon)
+     display.remove(background)
 
-function showAlertPlayAgainIcon()
-     if(paused == true) then
-          pauseButton("PauseButton.png")
-
-          paused = false
-          physics.start()
-          moveSpeed = beforePauseMoveSpeed
-     end
-
+     cloud.x = display.contentWidth
+     wind.x = 0
+     
+     live = nil
+     ghostBall = nil
+     --
      score = 0
      scoreTF.text = score
 
@@ -583,36 +671,7 @@ function showAlertPlayAgainIcon()
 
      moveSpeed = 2
 
-     display.remove(ball)
-     display.remove(live)
-     display.remove(ghostBall)
-     display.remove(blocks)
-     display.remove(alert)
-     display.remove(alertScore)
-     display.remove(playAgainIcon)
-     resetButton()
-
-     blocks = display.newGroup()
-
-     for i = 1, 3 do
-          local InitialBlock = display.newImage("Block_new.png")
-
-          InitialBlock.x = math.floor(math.random() * (display.contentWidth - InitialBlock.width))
-          InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
-
-          physics.addBody(InitialBlock, {denisty = blockDenisty, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
-          InitialBlock.bodyType = "static"
-
-          blocks:insert(InitialBlock)
-     end
-
-     ball = display.newImage("Ball.png")
-     ball.x = (display.contentWidth * 0.5)
-     ball.y = ball.height
-     ball:setReferencePoint(display.CenterReferencePoint)
-     ball.isBullet = true
-     gameListeners("add")
-
+     addTitleView()
 end
 
 function addLivePowerup()
