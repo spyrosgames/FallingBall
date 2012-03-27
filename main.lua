@@ -20,6 +20,7 @@ local moon
 local title
 local startButton
 local creditsButton
+local highscoresButton
 
 local titleView
 local creditsView
@@ -33,13 +34,15 @@ local scoreTF
 local score = 0
 local alertScore
 
+local respawnTF
+
 local blocks
 local monester
 local ball
 local anotherBall
 local ghostBall
 
-local ballDenisty = 1
+local ballDenisty = 10
 local blockDenisty = 1
 local ballBouncing = 0
 
@@ -93,6 +96,8 @@ local removeBadBlock = {}
 local launchOpenFeint = {}
 local moveClouds = {}
 local callFacebook = {}
+local respawn = {}
+local respawnTimer = {}
 
 local sprite = require('sprite')
 local spriteSheet = sprite.newSpriteSheet("BackgroundSpriteSheet.png", 320, 193)
@@ -120,9 +125,12 @@ local isAlertShown = false
 local moveSpeedWhenGhostBallPowerupTaken
 local beforePauseMoveSpeed
 
+local cloudPositionBeforeRespawn
+local windPositionBeforeRespawn
+
 function Main()
      display.setStatusBar(display.HiddenStatusBar)
-     system.setAccelerometerInterval(30)
+     system.setAccelerometerInterval(27)
      physics.setScale(60)
      addTitleView()
 
@@ -168,21 +176,34 @@ function addTitleView()
      --cloud.y = 240
 
      title = display.newImage("mainMenu.png")
+
      startButton = display.newImage("startBtn.png")
      startButton.x = display.contentCenterX - 70
      startButton.y = display.contentCenterY - 60
      startButton.name = "StartButton"
+     startButton.xScale = 0.8
+     startButton.yScale = 0.8
 
      creditsButton = display.newImage("creditsBtn.png")
-     creditsButton.x = display.contentCenterX + 92
+     creditsButton.x = display.contentCenterX + 89
      creditsButton.y = display.contentCenterY + 100
-     creditsButton.rotation = 30
+     creditsButton.xScale = 0.9
+     creditsButton.yScale = 0.9
+     creditsButton.rotation = 31
      creditsButton.name = "CreditsButton"
+
+     highscoresButton = display.newImage("highscoresBtn.png")
+     highscoresButton.x = display.contentCenterX - 25
+     highscoresButton.y = display.contentCenterY + 90
+     highscoresButton.xScale = 0.7
+     highscoresButton.yScale = 0.7
+     highscoresButton.rotation = -30
 
      titleView = display.newGroup()
      titleView:insert(title)
      titleView:insert(startButton)
      titleView:insert(creditsButton)
+     titleView:insert(highscoresButton)
 
      initialListeners("add")
 end
@@ -190,13 +211,13 @@ end
 function  initialListeners(action)
      if(action == "add") then
           startButton:addEventListener("tap", gameView)
-          --creditsButton:addEventListener("tap", showCredits)
-          creditsButton:addEventListener("tap", launchOpenFeint)
+          creditsButton:addEventListener("tap", showCredits)
+          highscoresButton:addEventListener("tap", launchOpenFeint)
 
      else
           startButton:removeEventListener("tap", gameView)
-          --creditsButton:removeEventListener("tap", showCredits)
-          creditsButton:removeEventListener("tap", launchOpenFeint)
+          creditsButton:removeEventListener("tap", showCredits)
+          highscoresButton:removeEventListener("tap", launchOpenFeint)
 
      end 
 end
@@ -213,6 +234,10 @@ function gameView()
      --Lives Text
      livesTF = display.newText('x3', 289, 56, system.nativeFont, 12)
      livesTF:setTextColor(245, 249, 248)
+     --Respawn Text
+     respawnTF = display.newText(' ', display.contentWidth * 0.5, 10)
+     respawnTF:setTextColor(255, 255, 255)
+
      pauseButton("PauseButton.png")
      resetButton()
 end
@@ -291,7 +316,8 @@ function moveMonester:accelerometer(e)
      --movement
      if(paused == false) then
           ball.x = display.contentCenterX + (display.contentCenterX * (e.xGravity*3))
-          ball.rotation = ball.x
+          --ball.rotation = ball.x
+          ball.rotation = ball.x + e.xGravity + 5
      end
 end
 
@@ -303,14 +329,29 @@ function  moveClouds()
      end
 end
 
+function resetCloud()
+     cloud.x = display.contentWidth
+end
+
+function  resetWind()
+     wind.x = 0
+end
 function update(e)
 if(paused == false) then
 
-     transition.from(cloud, {time = 500, x = cloud.x - 0.2 , transition = easing.outQuad})
-     transition.from(wind, {time = 500, x = wind.x + 0.4 , transition = easing.outQuad})
+     if(cloud.x > (-display.contentWidth)) then
+          transition.from(cloud, {time = 500, x = cloud.x - 0.2 , transition = easing.outQuad})
+     else
+          cloud.x = display.contentWidth
+     end
+     if(wind.x < (display.contentWidth)) then
+          transition.from(wind, {time = 500, x = wind.x + 0.4 , transition = easing.outQuad})
+     else
+          wind.x = 0
+     end
 
      if(ghostBallPowerupActive == false) then
-          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, isSensor = false, radius = 15})
+          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, isSensor = false, radius = 12})
      end
      if(ghostBallPowerupActive == true) then
                if(ball.y < (blocks[blocks.numChildren - 1].y - ball.height)) then
@@ -323,7 +364,7 @@ if(paused == false) then
      end
 
      if(isBadBlock == true) then
-          timer.performWithDelay(8000, removeBadBlock(thisBadBlock), 0)
+          timer.performWithDelay(10000, removeBadBlock(thisBadBlock), 0)
           isBadBlock = false
      end
      --if(ball.y > display.contentHeight) then
@@ -353,15 +394,45 @@ if(paused == false) then
 
      --Lose Lives
      if(ball.y < -5) then --top
-          ball.x =  blocks[blocks.numChildren - 1].x
-          ball.y = blocks[blocks.numChildren - 1].y - ball.height
           lives = lives - 1
           livesTF.text = 'x' .. lives
+
+          beforePauseMoveSpeed = moveSpeed
+
+          paused = true
+          physics.pause()
+          moveSpeed = 0
+          gameListeners("pause")
+
+          if(lives > 0) then
+               timer.performWithDelay(1000, respawnTimer())
+               timer.performWithDelay(4000, respawn)
+          else
+               respawn()
+          end
+          
+
      elseif(ball.y > display.contentHeight) then --bottom
-          ball.x =  blocks[blocks.numChildren - 1].x
-          ball.y = ball.height
+          --ball.x =  blocks[blocks.numChildren - 1].x
+          --ball.y = ball.height
           lives = lives - 1
-          livesTF.text = 'x' .. lives    
+          livesTF.text = 'x' .. lives
+
+          beforePauseMoveSpeed = moveSpeed
+
+          paused = true
+          physics.pause()
+          moveSpeed = 0
+          gameListeners("pause")
+
+          if(lives > 0) then
+               timer.performWithDelay(1000, respawnTimer())
+               timer.performWithDelay(4000, respawn)
+          else
+               respawn()
+          end
+               
+          
      end
 
      --Check for game over
@@ -394,8 +465,50 @@ if(paused == false) then
      if(score > 3000 and score < 3002) then
           moveSpeed = 6
           ball.y = ball.y + moveSpeed
+     end
+
+     if(score > 4000 and score < 4002) then
+          moveSpeed = 7
+          ball.y = ball.y + moveSpeed
+     end
+
+     if(score > 4000 and score < 4002) then
+          moveSpeed = 8
+          ball.y = ball.y + moveSpeed
      end 
 end
+end
+
+function respawn()
+     paused = false
+     physics.start()
+     moveSpeed = beforePauseMoveSpeed
+     gameListeners("resume")
+     ball.x =  blocks[blocks.numChildren - 1].x
+     --ball.y = blocks[blocks.numChildren - 1].y - ball.height
+     ball.y = ball.height + 5
+     --ball.y = display.contentHeight * 0.25
+end
+
+function respawnTimer()
+     respawnTF.text = "3"
+     timer.performWithDelay(1000, respawnTimerTwo)
+end
+
+function respawnTimerTwo()
+     respawnTF.text = " "
+     respawnTF.text = "2"
+     timer.performWithDelay(1000, respawnTimerThree)
+end
+
+function respawnTimerThree()
+     respawnTF.text = " "
+     respawnTF.text = "1"
+     timer.performWithDelay(1000, respawnTimerFour)
+end
+
+function respawnTimerFour()
+     respawnTF.text = " "
 end
 
 function addBlock()
@@ -631,7 +744,8 @@ function showAlert()
      playAgainIcon = display.newImage("ResetButton.png", 80, 300)
      playAgainIcon:addEventListener("tap", showAlertPlayAgainIcon)
 
-     facebookIcon = display.newImage("Facebook.png", 150, 300)
+     facebookIcon = display.newImage("Facebook.png", 136, 300)
+
      facebookIcon:addEventListener("tap", callFacebook)
 
      backToMainMenuIcon = display.newImage("backToMainMenuIcon.png", 220, 300)
@@ -642,7 +756,7 @@ end
 
 function backToMainMenu()
      scoreTF.text = ""
-     paused = false
+     
      display.remove(blocks)
      display.remove(alert)
      display.remove(pauseButtonUI)
@@ -670,7 +784,7 @@ function backToMainMenu()
      livesTF.text = "x" .. lives
 
      moveSpeed = 2
-
+     paused = false
      addTitleView()
 end
 
@@ -683,7 +797,7 @@ function addLivePowerup()
           live.y = blocks[blocks.numChildren - 1].y - live.height
           live.bodyType = "static"
           live.isFixedRotation = true
-          physics.addBody(live, {denisty = 1, friction = 0, bounce = 0})
+          physics.addBody(live, {denisty = 1, friction = 2, bounce = 0})
      end
 end
 
@@ -712,7 +826,8 @@ end
 
 function disableGhostBallPowerupEffect()
      ghostBallPowerupActive = false
-     moveSpeed = moveSpeedWhenGhostBallPowerupTaken
+     --moveSpeed = moveSpeedWhenGhostBallPowerupTaken
+     moveSpeed = moveSpeed - 0.1
      --ball.y = ball.y + moveSpeed
 end
 
@@ -724,6 +839,7 @@ function collisionHandler(e)
      if(e.other.name == "bad") then
           isBadBlock = true
           thisBadBlock = e.other
+
      end
 
      --Lives Powerup
@@ -761,16 +877,13 @@ function  callFacebook()
                     local theMessage = "Just scored" .. gamescore .. "playing the Falling Ball on iPhone!"
 
                     facebook.request("me/feed", "POST", {
-                    message=theMessage,
-                    name="Download Sky Balloon to compete!",
-                    caption="Think you can beat my score of " .. gameScore .. "?",
-                    link="http://itunes.apple.com/gb/app/sky-balloon/id444988620?mt=8",
-                    picture="http://www.georgecrawford.co.uk/apps/skyballoon90.png" })
+                    message=theMessage})
                end
           end
      end
-     facebook.login("139122219775879", facebookListener, { "publish_stream" })
+     facebook.login("200498513395966", facebookListener, {"publish_stream"})
 end
+
 Main()
 
 
