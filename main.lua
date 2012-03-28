@@ -64,6 +64,13 @@ local alert
 local playAgainIcon
 local facebookIcon
 local backToMainMenuIcon
+local respawning = false
+
+local livesHUD
+local scoreHUD
+
+local respawnTimer
+local afterRespawnTimer
 
 --Functions
 local Main = {}
@@ -227,16 +234,26 @@ function gameView()
      --Remove Menu View and Start the game
      transition.to(titleView, {time = 500, y = titleView.height, transition = easing.outQuad, onComplete = function()display.remove(titleView) titleView = nil addInitialBlocks(3)end})
      --transition.to(titleView, {time = 500, x = display.contentWidth * 2, transition = easing.inQuad, onComplete = function()display.remove(titleView) titleView = nil addInitialBlocks(3)end})
-
+     --HUDs
+     --Score
+     scoreHUD = display.newImage("hudforscore.png")
+     scoreHUD.x = 290
+     scoreHUD.y = 160
+     --Lives
+     livesHUD = display.newImage("hudforlives.png")
+     livesHUD.x = 290
+     livesHUD.y = 190
+     --
      --Score Text
-     scoreTF = display.newText('0', 303, 22, system.nativeFont, 12)
-     scoreTF:setTextColor(68, 68, 68)
+     scoreTF = display.newText('0', 289, 150, system.nativeFont, 12)
+     scoreTF:setTextColor(0, 0, 0)
      --Lives Text
-     livesTF = display.newText('x3', 289, 56, system.nativeFont, 12)
-     livesTF:setTextColor(245, 249, 248)
+     livesTF = display.newText('x3', 282, 182, system.nativeFont, 12)
+     livesTF:setTextColor(0, 0, 0)
      --Respawn Text
-     respawnTF = display.newText(' ', display.contentWidth * 0.5, 10)
+     respawnTF = display.newText(' ', display.contentWidth * 0.5, display.contentHeight * 0.5)
      respawnTF:setTextColor(255, 255, 255)
+     respawnTF.size = 70
 
      pauseButton("PauseButton.png")
      resetButton()
@@ -317,7 +334,7 @@ function moveMonester:accelerometer(e)
      if(paused == false) then
           ball.x = display.contentCenterX + (display.contentCenterX * (e.xGravity*3))
           --ball.rotation = ball.x
-          ball.rotation = ball.x + e.xGravity + 5
+          ball.rotation = ball.x + e.xGravity + 9
      end
 end
 
@@ -330,28 +347,33 @@ function  moveClouds()
 end
 
 function resetCloud()
-     cloud.x = display.contentWidth
+     if(respawning == false) then
+          cloud.x = display.contentWidth
+     end
 end
 
 function  resetWind()
-     wind.x = 0
+     if(respawning == false) then
+          wind.x = 0
+     end
 end
 function update(e)
 if(paused == false) then
 
-     if(cloud.x > (-display.contentWidth)) then
+     if(cloud.x > (-cloud.width)) then
           transition.from(cloud, {time = 500, x = cloud.x - 0.2 , transition = easing.outQuad})
      else
-          cloud.x = display.contentWidth
+          transition.from(cloud, {time = 500, x = display.contentWidth + cloud.width , transition = easing.outQuad})          
      end
-     if(wind.x < (display.contentWidth)) then
+
+     if(wind.x < (display.contentWidth + (wind.width) )) then
           transition.from(wind, {time = 500, x = wind.x + 0.4 , transition = easing.outQuad})
      else
-          wind.x = 0
+          transition.from(wind, {time = 500, x = -(wind.width) , transition = easing.outQuad})     
      end
 
      if(ghostBallPowerupActive == false) then
-          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, isSensor = false, radius = 12})
+          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, isSensor = false, radius = 11})
      end
      if(ghostBallPowerupActive == true) then
                if(ball.y < (blocks[blocks.numChildren - 1].y - ball.height)) then
@@ -387,13 +409,15 @@ if(paused == false) then
           --Blocks Movement
           blocks[i].y = blocks[i].y - moveSpeed
      end
-
      --Score
      score = score + 1
      scoreTF.text = score
 
+
      --Lose Lives
      if(ball.y < -5) then --top
+
+          respawning = true
           lives = lives - 1
           livesTF.text = 'x' .. lives
 
@@ -404,17 +428,22 @@ if(paused == false) then
           moveSpeed = 0
           gameListeners("pause")
 
+          ball.x =  blocks[blocks.numChildren - 1].x
+          ball.y = blocks[blocks.numChildren - 1].y - ball.height
+          --ball.y = ball.height + 5
+          --ball.y = display.contentHeight * 0.25
+
           if(lives > 0) then
                timer.performWithDelay(1000, respawnTimer())
-               timer.performWithDelay(4000, respawn)
+               timer.performWithDelay(3000, respawn)
           else
                respawn()
           end
           
 
      elseif(ball.y > display.contentHeight) then --bottom
-          --ball.x =  blocks[blocks.numChildren - 1].x
-          --ball.y = ball.height
+
+          respawning = true
           lives = lives - 1
           livesTF.text = 'x' .. lives
 
@@ -424,10 +453,15 @@ if(paused == false) then
           physics.pause()
           moveSpeed = 0
           gameListeners("pause")
+          
+          ball.x =  blocks[blocks.numChildren - 1].x
+          ball.y = blocks[blocks.numChildren - 1].y - ball.height
+          --ball.y = ball.height + 5
+          --ball.y = display.contentHeight * 0.25
 
           if(lives > 0) then
                timer.performWithDelay(1000, respawnTimer())
-               timer.performWithDelay(4000, respawn)
+               respawnTimer = timer.performWithDelay(4000, respawn)
           else
                respawn()
           end
@@ -481,13 +515,12 @@ end
 
 function respawn()
      paused = false
+     respawning = false
      physics.start()
-     moveSpeed = beforePauseMoveSpeed
+     moveSpeed = 2
+     physics.setGravity(0, 4.7)
      gameListeners("resume")
-     ball.x =  blocks[blocks.numChildren - 1].x
-     --ball.y = blocks[blocks.numChildren - 1].y - ball.height
-     ball.y = ball.height + 5
-     --ball.y = display.contentHeight * 0.25
+     afterRespawnTimer = timer.performWithDelay(2000, respawnTimerFive)
 end
 
 function respawnTimer()
@@ -511,25 +544,44 @@ function respawnTimerFour()
      respawnTF.text = " "
 end
 
+function respawnTimerFive()
+     moveSpeed = beforePauseMoveSpeed
+     physics.setGravity(0, 9.8)
+end
+
 function addBlock()
      --local r = math.floor(math.random() * 2)
-     local r = math.random(0, 3)
-     if(r ~= 3) then
+     local r = math.floor(math.random() * 4)
+     if(r ~= 0) then
           local block = display.newImage("Block_new.png")
           block.name = "block"
           block.x = math.random() * (display.contentWidth - (block.width * 0.5))
+          if(block.x < 0) then
+               block.x = 5
+          end
+          if(block.x > display.contentWidth)then
+               block.x = display.contentWidth - block.width
+          end
           block.y = display.contentHeight + block.height
           physics.addBody(block, {denisty = blockDenisty, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           block.bodyType = "static"
 
           blocks:insert(block)
-     elseif(r ~= 1) then
+     else
           local badBlock = display.newImage("badBlock.png")
           badBlock.name = "bad"
           
           physics.addBody(badBlock, {denisty = 3, bounce = 0, isSensor = false, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           badBlock.bodyType = "static"
           badBlock.x = math.random() * (display.contentWidth - (badBlock.width * 0.5))
+
+          if(badBlock.x < 0) then
+               badBlock.x = 5
+          end
+          if(badBlock.x > display.contentWidth)then
+               badBlock.x = display.contentWidth - badBlock.width
+          end
+
           badBlock.y = display.contentHeight + badBlock.height
 
           blocks:insert(badBlock)
@@ -563,17 +615,20 @@ function  pauseButton(photo)
           pauseButtonUI = display.newImage("PlayButton.png")
      end
 
-     pauseButtonUI.x = 30
-     pauseButtonUI.y = 30
+     pauseButtonUI.x = 290
+     pauseButtonUI.y = 40
 end
 
 function  resetButton()
      resetButtonUI = display.newImage("ResetButton.png")
-     resetButtonUI.x = 90
-     resetButtonUI.y = 30
+     resetButtonUI.x = 290
+     resetButtonUI.y = 110
+     resetButtonUI.xScale = 0.9
+     resetButtonUI.yScale = 0.9
 end
 
 function pauseButtonEffect()
+     if(respawning == false)then
      if(paused == false) then
           --display.remove(pauseButtonUI)
           pauseButton("PlayButton.png")
@@ -592,10 +647,12 @@ function pauseButtonEffect()
           physics.start()
           moveSpeed = beforePauseMoveSpeed
           gameListeners("resume")
-     end 
+     end
+     end
 end
 
 function  resetButtonEffect()
+     if(respawning == false) then
      if(paused == true) then
           pauseButton("PauseButton.png")
 
@@ -664,6 +721,7 @@ function  resetButtonEffect()
 
      ball:addEventListener("collision", collisionHandler)
      --
+     end
 end
 
 function showAlertPlayAgainIcon()
@@ -733,7 +791,7 @@ function showAlert()
      alert = display.newImage("alertBg.png", 70, 190)
 
      alertScore = display.newText(scoreTF.text .. "!", 134, 240, native.systemFontBold, 30)
-     livesTF.text = ""
+     --livesTF.text = ""
 
      display.remove(ball)
      display.remove(live)
@@ -741,14 +799,14 @@ function showAlert()
      display.remove(resetButtonUI)
      transition.from(alert, {time = 200, xScale = 0.8})
      
-     playAgainIcon = display.newImage("ResetButton.png", 80, 300)
+     playAgainIcon = display.newImage("ResetButton.png", 84, 300)
      playAgainIcon:addEventListener("tap", showAlertPlayAgainIcon)
 
-     facebookIcon = display.newImage("Facebook.png", 136, 300)
+     facebookIcon = display.newImage("Facebook.png", 142, 298)
 
      facebookIcon:addEventListener("tap", callFacebook)
 
-     backToMainMenuIcon = display.newImage("backToMainMenuIcon.png", 220, 300)
+     backToMainMenuIcon = display.newImage("backToMainMenuIcon.png", 198, 298)
      backToMainMenuIcon:addEventListener("tap", backToMainMenu)
 
      openfeint.setHighScore( { leaderboardID="1116637", score=score } )
@@ -795,6 +853,9 @@ function addLivePowerup()
           live.name = "live"
           live.x = blocks[blocks.numChildren - 1].x
           live.y = blocks[blocks.numChildren - 1].y - live.height
+          if(live.y < -5) then --at top, will fall
+               live.y = live.y - 20
+          end
           live.bodyType = "static"
           live.isFixedRotation = true
           physics.addBody(live, {denisty = 1, friction = 2, bounce = 0})
@@ -808,7 +869,10 @@ function ghostBallPowerup()
           ghostBall.name = "ghostBallPowerup"
 
           ghostBall.x = blocks[blocks.numChildren - 1].x + 0.8
-          ghostBall.y = blocks[blocks.numChildren - 2].y - ghostBall.height
+          ghostBall.y = blocks[blocks.numChildren - 1].y - ghostBall.height
+          if(ghostBall.y < -5) then --at top, will fall
+               ghostBall.y = ghostBall.y - 20
+          end
           ghostBall.bodyType = "static"
           ghostBall.isFixedRotation = true
           physics.addBody(ghostBall, {denisty = 1, friction = 0, bounce = 0})
@@ -828,7 +892,7 @@ function disableGhostBallPowerupEffect()
      ghostBallPowerupActive = false
      --moveSpeed = moveSpeedWhenGhostBallPowerupTaken
      moveSpeed = moveSpeed - 0.1
-     --ball.y = ball.y + moveSpeed
+     ball.y = ball.y + moveSpeed
 end
 
 function removeBadBlock(e)
