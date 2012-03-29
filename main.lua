@@ -25,6 +25,10 @@ local highscoresButton
 local titleView
 local creditsView
 
+local credits
+local website
+local backFromCreditsButton
+
 local live
 
 local livesTF
@@ -42,9 +46,9 @@ local ball
 local anotherBall
 local ghostBall
 
-local ballDenisty = 1
-local blockDenisty = 3
-local ballBouncing = 0
+local ballDenisty = 4
+local blockDenisty = 1
+local ballBouncing = 0.1
 
 local gameView
 
@@ -56,9 +60,11 @@ local twoBallsPowerupTimer
 local ghostBallPowerupTimer
 local checkForGhostBallPowerupTimer
 local cloudsTimer
+local checkForLivePowerupPositionTimer
 
 local pauseButtonUI
 local resetButtonUI
+local muteButtonUI
 
 local alert
 local playAgainIcon
@@ -73,6 +79,10 @@ local respawnTimer
 local afterRespawnTimer
 
 local ballSound = audio.loadSound('Ball_Hit.mp3')
+
+local muted = false
+local livePowerUpStarted = false
+
 --Functions
 local Main = {}
 local addTitleView = {}
@@ -106,6 +116,9 @@ local moveClouds = {}
 local callFacebook = {}
 local respawn = {}
 local respawnTimer = {}
+local pauseButtonEffect = {}
+local resetButtonEffect = {}
+local muteButtonEffect = {}
 
 local sprite = require('sprite')
 local spriteSheet = sprite.newSpriteSheet("BackgroundSpriteSheet.png", 320, 193)
@@ -138,14 +151,14 @@ local windPositionBeforeRespawn
 
 function Main()
      display.setStatusBar(display.HiddenStatusBar)
-     system.setAccelerometerInterval(65)
+     system.setAccelerometerInterval(40)
      physics.setScale(60)
      addTitleView()
 
      openfeint.init("vEIQcyk6tNGeHGrJLFFA", "WAQEekVOmhYJOLewycV9aaBtiiocikAj57MM4SpDe4", "Falling Ball")
 
-     local sysFonts = native.getFontNames()
-     for k,v in pairs(sysFonts) do print(v) end
+     --local sysFonts = native.getFontNames()
+     --for k,v in pairs(sysFonts) do print(v) end
 end
 
 function addMoon()
@@ -242,25 +255,24 @@ function gameView()
      --Score
      scoreHUD = display.newImage("hudforscore.png")
      scoreHUD.x = 287
-     scoreHUD.y = 160
+     scoreHUD.y = 210
      --Lives
      livesHUD = display.newImage("hudforlives.png")
      livesHUD.x = 290
-     livesHUD.y = 201
+     livesHUD.y = 261
      --
      --Score Text
-     scoreTF = display.newText('0', 285, 152, "PizzaDudesHandwriting", 12)
+     scoreTF = display.newText('0', 285, 200, native.systemFont, 12)
      scoreTF:setTextColor(255, 255, 255)
      --Lives Text
-     livesTF = display.newText('x3', 282, 192, "PizzaDudesHandwriting", 12)
+     livesTF = display.newText('x3', 283, 253, native.systemFont, 12)
      livesTF:setTextColor(0, 0, 0)
-     --Respawn Text
-     respawnTF = display.newText(' ', display.contentWidth * 0.5, display.contentHeight * 0.5, "PizzaDudesHandwriting", 70)
-     respawnTF:setTextColor(255, 255, 255)
+
      --respawnTF.size = 70
 
      pauseButton("PauseButton.png")
      resetButton()
+     muteButton()
 end
 
 function addInitialBlocks(n)
@@ -280,7 +292,7 @@ function addInitialBlocks(n)
           block.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
           --block.y = display.contentHeight + block.height
 
-          physics.addBody(block, {denisty = blockDenisty, friction = 0.4, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(block, {denisty = blockDenisty, friction = 20, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           block.bodyType = "static"
 
           blocks:insert(block)
@@ -308,16 +320,19 @@ function gameListeners(action)
           Runtime:addEventListener("enterFrame", update)
           blockTimer = timer.performWithDelay(1000, addBlock, 0)
           liveTimer = timer.performWithDelay(6000, addLivePowerup, 0)
+          checkForLivePowerupPositionTimer = timer.performWithDelay(1000, checkForLivePowerupPosition, 0)
           --ghostBallPowerupTimer = timer.performWithDelay(11000, ghostBallPowerup, 0)
           --checkForGhostBallPowerupTimer = timer.performWithDelay(10000, ghostBallPowerupEffect, 0)
           ball:addEventListener("collision", collisionHandler)
           pauseButtonUI:addEventListener("tap", pauseButtonEffect)
           resetButtonUI:addEventListener("tap", resetButtonEffect)
+          muteButtonUI:addEventListener("tap", muteButtonEffect)
      elseif(action == "rmv") then
           Runtime:removeEventListener("accelerometer", moveMonester)
           Runtime:removeEventListener("enterFrame", update)
           timer.cancel(blockTimer)
           timer.cancel(liveTimer)
+          timer.cancel(checkForLivePowerupPositionTimer)
           --timer.cancel(ghostBallPowerupTimer)
           --timer.cancel(checkForGhostBallPowerupTimer)
 
@@ -329,15 +344,17 @@ function gameListeners(action)
           ball:removeEventListener("collision", collisionHandler)
           pauseButtonUI:removeEventListener("tap", pauseButtonEffect)
           resetButtonUI:removeEventListener("tap", resetButtonEffect)
-
+          muteButtonUI:removeEventListener("tap", muteButtonEffect)
      elseif(action == "pause") then
           timer.pause(blockTimer)
           timer.pause(liveTimer)
+          timer.pause(checkForLivePowerupPositionTimer)
           --timer.pause(ghostBallPowerupTimer)
           --timer.pause(checkForGhostBallPowerupTimer)
      elseif(action == "resume") then
           timer.resume(blockTimer)
           timer.resume(liveTimer)
+          timer.resume(checkForLivePowerupPositionTimer)
           --timer.resume(ghostBallPowerupTimer)
           --timer.resume(checkForGhostBallPowerupTimer)
      end     
@@ -347,9 +364,9 @@ function moveMonester:accelerometer(e)
      --movement
      if(paused == false) then
           --ball.x = display.contentCenterX + (display.contentCenterX * (e.xGravity*3))
-          ball.x = ball.x + (17 * e.xGravity)
+          ball.x = ball.x + (18 * e.xGravity)
           --ball.y = ball.y - (35 * e.yGravity)
-          ball.rotation = ball.x + e.xGravity + 20
+          ball.rotation = ball.x + (e.xGravity * 40)
           physics.setGravity( ( 9.8 * event.xGravity ), ( -9.8 * event.yGravity ) )
      end
 end
@@ -375,7 +392,17 @@ function  resetWind()
 end
 function update(e)
 if(paused == false) then
-
+     --[[
+     if(livePowerUpStarted == true)then
+     if(live.y < -5) then --at top, will fall
+          live.x = blocks[blocks.numChildren - 1].x
+          live.y = blocks[blocks.numChildren - 1].y - live.height
+          --display.remove(live)
+          livePowerUpStarted = false
+     end
+     
+     end
+     --]]
      if(cloud.x > (-cloud.width)) then
           transition.from(cloud, {time = 500, x = cloud.x - 0.2 , transition = easing.outQuad})
      else
@@ -389,7 +416,7 @@ if(paused == false) then
      end
 
      if(ghostBallPowerupActive == false) then
-          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, friction = 2, isSensor = false, radius = 11})
+          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, friction = 20, isSensor = false, radius = 11})
      end
      if(ghostBallPowerupActive == true) then
                if(ball.y < (blocks[blocks.numChildren - 1].y - ball.height)) then
@@ -553,7 +580,11 @@ function respawn()
 end
 
 function respawnTimer()
-     respawnTF.text = "3"
+     --respawnTF.text = "3"
+     --Respawn Text
+     respawnTF = display.newText('3', display.contentWidth * 0.5, display.contentHeight * 0.4, native.systemFont, 70)
+     respawnTF:setTextColor(255, 255, 255)
+
      timer.performWithDelay(1000, respawnTimerTwo)
 end
 
@@ -582,8 +613,8 @@ end
 function addBlock()
      --local r = math.floor(math.random() * 2)
      --local r = math.floor(math.random(0, 3))
-     local r = math.random(0, 4)
-     if(r == 0 or r == 1 or r == 2 or r == 2.5 or r == 4) then
+     local r = math.random(0, 6)
+     if(r >=0 and r <= 5) then
           local block = display.newImage("Block_new.png")
           block.name = "block"
           block.x = math.random() * (display.contentWidth - (block.width * 0.5))
@@ -594,15 +625,15 @@ function addBlock()
                block.x = display.contentWidth - block.width
           end
           block.y = display.contentHeight + block.height
-          physics.addBody(block, {denisty = blockDenisty, friction = 0.4, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(block, {denisty = blockDenisty, friction = 20, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           block.bodyType = "static"
 
           blocks:insert(block)
-     elseif(r == 3) then
+     elseif(r == 6) then
           local badBlock = display.newImage("badBlock.png")
           badBlock.name = "bad"
           
-          physics.addBody(badBlock, {denisty = 6, friction = 0.4, bounce = 0.3, isSensor = false, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(badBlock, {denisty = 6, friction = 20, bounce = 0.3, isSensor = false, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           badBlock.bodyType = "static"
           badBlock.x = math.random() * (display.contentWidth - (badBlock.width * 0.5))
 
@@ -621,22 +652,49 @@ end
 
 function showCredits()
      credits = display.newImage("creditsView.png")
+     website = display.newImage("website.png")
+     website.y = display.contentHeight * 0.5 + 60
+     website.x = display.contentWidth * 0.5
+
+     backFromCreditsButton = display.newImage("backToMainMenuIcon.png")
+     backFromCreditsButton.rotation = 360
+     backFromCreditsButton.y = display.contentHeight * 0.9
+     backFromCreditsButton.x = 50
+
      transition.from(credits, {time = 400, x = display.contentWidth * 2, transition = easing.outQuad})
-     credits:addEventListener("tap", hideCredits)
+     transition.from(website, {time = 400, x = display.contentWidth * 2, transition = easing.outQuad})
+     transition.from(backFromCreditsButton, {time = 400, x = display.contentWidth * 2, transition = easing.outQuad})
+
+     backFromCreditsButton:addEventListener("tap", hideCredits)
+     website:addEventListener("tap", goToWebsite)
+
      startButton.isVisible = false
      creditsButton.isVisible = false
+end
+
+function goToWebsite()
+     native.showWebPopup(10, 100, 300, 300, "http://www.spyros-games.com")
 end
 
 function  hideCredits()
      startButton.isVisible = true
      creditsButton.isVisible = true
      transition.to(credits, {time = 600, x = display.contentWidth * 2, transition = easing.outQuad, onComplete = destroyCredits})
+     transition.to(website, {time = 600, x = display.contentWidth * 2, transition = easing.outQuad, onComplete = destroyCredits})
+     transition.to(backFromCreditsButton, {time = 600, x = display.contentWidth * 2, transition = easing.outQuad, onComplete = destroyCredits})
+     native.cancelWebPopup()
 end
 
 function  destroyCredits()
      credits:removeEventListener("tap", hideCredits)
+
      display.remove(credits)
+     display.remove(website)
+     display.remove(backFromCreditsButton)
+
      credits = nil
+     website = nil
+     backFromCreditsButton = nil
 end
 
 function  pauseButton(photo)
@@ -658,6 +716,16 @@ function  resetButton()
      resetButtonUI.yScale = 0.9
 end
 
+function muteButton()
+     if(muted == true) then
+          muteButtonUI = display.newImage("UnMute.png")
+     elseif(muted == false) then
+          muteButtonUI = display.newImage("Mute.png")
+     end
+
+     muteButtonUI.x = 290
+     muteButtonUI.y = 158
+end
 function pauseButtonEffect()
      if(respawning == false)then
      if(paused == false) then
@@ -682,6 +750,18 @@ function pauseButtonEffect()
      end
 end
 
+function muteButtonEffect()
+     if(muted == false)then
+          muted = true
+          --display.remove(muteButtonUI)
+          muteButton()
+     elseif(muted == true)then
+          muted = false
+          display.remove(muteButtonUI)
+          muteButton()
+     end
+end
+
 function  resetButtonEffect()
      if(respawning == false) then
      if(paused == true) then
@@ -695,13 +775,13 @@ function  resetButtonEffect()
      display.remove(blocks)
      display.remove(ball)
      display.remove(live)
-     display.remove(ghostBall)
+     --display.remove(ghostBall)
 
      cloud.x = display.contentWidth
      wind.x = 0
      
-     live = nil
-     ghostBall = nil
+     --live = nil
+     --ghostBall = nil
      --
      score = 0
      scoreTF.text = score
@@ -710,11 +790,13 @@ function  resetButtonEffect()
      livesTF.text = "x" .. lives
 
      moveSpeed = 2
+     livePowerUpStarted = false
      --
      --remove Listeners
      Runtime:removeEventListener("enterFrame", update)
      timer.cancel(blockTimer)
      timer.cancel(liveTimer)
+     timer.cancel(checkForLivePowerupPositionTimer)
      --timer.cancel(ghostBallPowerupTimer)
      --timer.cancel(checkForGhostBallPowerupTimer)
      ball:removeEventListener("collision", collisionHandler)
@@ -738,7 +820,7 @@ function  resetButtonEffect()
           --block.x = math.random() * (display.contentWidth - (block.width * 0.5))
           InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
 
-          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 0.4, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 7, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           InitialBlock.bodyType = "static"
 
           blocks:insert(InitialBlock)
@@ -777,7 +859,7 @@ function showAlertPlayAgainIcon()
      display.remove(blocks)
      display.remove(ball)
      display.remove(live)
-     display.remove(ghostBall)
+     --display.remove(ghostBall)
      display.remove(alert)
      display.remove(alertScore)
      display.remove(playAgainIcon)
@@ -787,8 +869,8 @@ function showAlertPlayAgainIcon()
      cloud.x = display.contentWidth
      wind.x = 0
      
-     live = nil
-     ghostBall = nil
+     --live = nil
+     --ghostBall = nil
      --
      score = 0
      scoreTF.text = score
@@ -797,6 +879,7 @@ function showAlertPlayAgainIcon()
      livesTF.text = "x" .. lives
 
      moveSpeed = 2
+     livePowerUpStarted = false
 
      resetButton()
 
@@ -819,7 +902,7 @@ function showAlertPlayAgainIcon()
           --block.x = math.random() * (display.contentWidth - (block.width * 0.5))
           InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
 
-          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 0.4, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 20, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           InitialBlock.bodyType = "static"
 
           blocks:insert(InitialBlock)
@@ -841,12 +924,15 @@ function showAlert()
      gameListeners("rmv")
      alert = display.newImage("alertBg.png", 70, 190)
 
-     alertScore = display.newText(scoreTF.text .. "!", 134, 240, "PizzaDudesHandwriting", 30)
+     alertScore = display.newText(scoreTF.text .. "!", 134, 240, native.systemFont, 30)
      --livesTF.text = ""
+     --live = nil
 
      display.remove(ball)
      display.remove(live)
-     display.remove(ghostBall)
+     --display.remove(ghostBall)
+     
+
      display.remove(resetButtonUI)
      transition.from(alert, {time = 200, xScale = 0.8})
      
@@ -883,8 +969,8 @@ function backToMainMenu()
      cloud.x = display.contentWidth
      wind.x = 0
      
-     live = nil
-     ghostBall = nil
+     --live = nil
+     --ghostBall = nil
      --
      score = 0
      scoreTF.text = score
@@ -894,6 +980,7 @@ function backToMainMenu()
 
      moveSpeed = 2
      paused = false
+     livePowerUpStarted = false
      addTitleView()
 end
 
@@ -904,15 +991,21 @@ function addLivePowerup()
           live.name = "live"
           live.x = blocks[blocks.numChildren - 1].x
           live.y = blocks[blocks.numChildren - 1].y - live.height
-          if(live.y < -5) then --at top, will fall
-               live.y = live.y - 20
-          end
-          live.bodyType = "static"
+
+          live.bodyType = "kinematic"
           live.isFixedRotation = true
-          physics.addBody(live, {denisty = 1, friction = 2, bounce = 0})
+          physics.addBody(live, {denisty = 1, friction = 20, bounce = 0})
+          livePowerUpStarted = true
      end
 end
 
+function checkForLivePowerupPosition()
+     if(live ~= nil)then
+          if(live.y < -5)then
+               display.remove(live)
+          end
+     end
+end
 function ghostBallPowerup()
      if(ball.y < (blocks[blocks.numChildren].y)) then
           ghostBall = display.newImage("ghost.png")
@@ -952,13 +1045,17 @@ end
 
 function collisionHandler(e)
      if(e.other.name == "bad") then
-          audio.play(ballSound)
+          if(muted == false) then
+               audio.play(ballSound)
+          end
           isBadBlock = true
           thisBadBlock = e.other
      end
 
      if(e.other.name == "block") then
-          audio.play(ballSound)
+          if(muted == false) then
+               audio.play(ballSound)
+          end
      end
 
      --Lives Powerup

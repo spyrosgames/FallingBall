@@ -15,7 +15,7 @@ settings = {
 			UIApplicationExitsOnSuspend = false,
 			UIAppFonts = 
             {
-            	"GameFont.ttf"
+            	"Scribble Box.ttf"
             }
 		},
 	},
