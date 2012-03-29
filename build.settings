@@ -13,7 +13,11 @@ settings = {
 			UIStatusBarHidden = false,
 			UIPrerenderedIcon = true, -- set to false for "shine" overlay
 			UIApplicationExitsOnSuspend = false,
-		}
+			UIAppFonts = 
+            {
+            	"GameFont.ttf"
+            }
+		},
 	},
 	
 	--[[ For Android:

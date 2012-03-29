@@ -42,8 +42,8 @@ local ball
 local anotherBall
 local ghostBall
 
-local ballDenisty = 10
-local blockDenisty = 1
+local ballDenisty = 1
+local blockDenisty = 3
 local ballBouncing = 0
 
 local gameView
@@ -72,6 +72,7 @@ local scoreHUD
 local respawnTimer
 local afterRespawnTimer
 
+local ballSound = audio.loadSound('Ball_Hit.mp3')
 --Functions
 local Main = {}
 local addTitleView = {}
@@ -137,11 +138,14 @@ local windPositionBeforeRespawn
 
 function Main()
      display.setStatusBar(display.HiddenStatusBar)
-     system.setAccelerometerInterval(27)
+     system.setAccelerometerInterval(65)
      physics.setScale(60)
      addTitleView()
 
      openfeint.init("vEIQcyk6tNGeHGrJLFFA", "WAQEekVOmhYJOLewycV9aaBtiiocikAj57MM4SpDe4", "Falling Ball")
+
+     local sysFonts = native.getFontNames()
+     for k,v in pairs(sysFonts) do print(v) end
 end
 
 function addMoon()
@@ -185,11 +189,11 @@ function addTitleView()
      title = display.newImage("mainMenu.png")
 
      startButton = display.newImage("startBtn.png")
-     startButton.x = display.contentCenterX - 70
+     startButton.x = display.contentCenterX - 72
      startButton.y = display.contentCenterY - 60
      startButton.name = "StartButton"
-     startButton.xScale = 0.8
-     startButton.yScale = 0.8
+     startButton.xScale = 0.9
+     startButton.yScale = 0.9
 
      creditsButton = display.newImage("creditsBtn.png")
      creditsButton.x = display.contentCenterX + 89
@@ -237,23 +241,23 @@ function gameView()
      --HUDs
      --Score
      scoreHUD = display.newImage("hudforscore.png")
-     scoreHUD.x = 290
+     scoreHUD.x = 287
      scoreHUD.y = 160
      --Lives
      livesHUD = display.newImage("hudforlives.png")
      livesHUD.x = 290
-     livesHUD.y = 190
+     livesHUD.y = 201
      --
      --Score Text
-     scoreTF = display.newText('0', 289, 150, system.nativeFont, 12)
-     scoreTF:setTextColor(0, 0, 0)
+     scoreTF = display.newText('0', 285, 152, "PizzaDudesHandwriting", 12)
+     scoreTF:setTextColor(255, 255, 255)
      --Lives Text
-     livesTF = display.newText('x3', 282, 182, system.nativeFont, 12)
+     livesTF = display.newText('x3', 282, 192, "PizzaDudesHandwriting", 12)
      livesTF:setTextColor(0, 0, 0)
      --Respawn Text
-     respawnTF = display.newText(' ', display.contentWidth * 0.5, display.contentHeight * 0.5)
+     respawnTF = display.newText(' ', display.contentWidth * 0.5, display.contentHeight * 0.5, "PizzaDudesHandwriting", 70)
      respawnTF:setTextColor(255, 255, 255)
-     respawnTF.size = 70
+     --respawnTF.size = 70
 
      pauseButton("PauseButton.png")
      resetButton()
@@ -264,11 +268,19 @@ function addInitialBlocks(n)
 
      for i = 1, n do
           local block = display.newImage("Block_new.png")
-
-          block.x = math.floor(math.random() * (display.contentWidth - block.width))
+          block.name = "block"
+          block.x = math.random() * (display.contentWidth - (block.width * 0.5))
+          if((block.x - (block.contentWidth * 0.5)) < 0) then
+               block.x = display.contentWidth * 0.25
+          end
+          if(block.x > display.contentWidth)then
+               block.x = display.contentWidth - block.width
+          end
+          --block.x = math.random() * (display.contentWidth - (block.width * 0.5))
           block.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
+          --block.y = display.contentHeight + block.height
 
-          physics.addBody(block, {denisty = blockDenisty, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(block, {denisty = blockDenisty, friction = 0.4, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           block.bodyType = "static"
 
           blocks:insert(block)
@@ -278,8 +290,13 @@ end
 
 function addBall()
      ball = display.newImage("Ball.png")
-     ball.x = (display.contentWidth * 0.5)
-     ball.y = ball.height
+     
+     --ball.x = (display.contentWidth * 0.5)
+     --ball.y = ball.height
+
+     ball.x =  blocks[1].x
+     ball.y = blocks[1].y - ball.height
+
      ball:setReferencePoint(display.CenterReferencePoint)
      ball.isBullet = true
      gameListeners("add")
@@ -290,10 +307,9 @@ function gameListeners(action)
           Runtime:addEventListener("accelerometer", moveMonester)
           Runtime:addEventListener("enterFrame", update)
           blockTimer = timer.performWithDelay(1000, addBlock, 0)
-          liveTimer = timer.performWithDelay(10000, addLivePowerup, 0)
-          ghostBallPowerupTimer = timer.performWithDelay(11000, ghostBallPowerup, 0)
-          checkForGhostBallPowerupTimer = timer.performWithDelay(10000, ghostBallPowerupEffect, 0)
-          --cloudsTimer = timer.performWithDelay(1000, moveClouds, 0)
+          liveTimer = timer.performWithDelay(6000, addLivePowerup, 0)
+          --ghostBallPowerupTimer = timer.performWithDelay(11000, ghostBallPowerup, 0)
+          --checkForGhostBallPowerupTimer = timer.performWithDelay(10000, ghostBallPowerupEffect, 0)
           ball:addEventListener("collision", collisionHandler)
           pauseButtonUI:addEventListener("tap", pauseButtonEffect)
           resetButtonUI:addEventListener("tap", resetButtonEffect)
@@ -302,9 +318,9 @@ function gameListeners(action)
           Runtime:removeEventListener("enterFrame", update)
           timer.cancel(blockTimer)
           timer.cancel(liveTimer)
-          timer.cancel(ghostBallPowerupTimer)
-          timer.cancel(checkForGhostBallPowerupTimer)
-          --timer.cancel(cloudsTimer)
+          --timer.cancel(ghostBallPowerupTimer)
+          --timer.cancel(checkForGhostBallPowerupTimer)
+
           --blockTimer = nil
           --liveTimer = nil
           --ghostBallPowerupTimer = nil
@@ -317,24 +333,24 @@ function gameListeners(action)
      elseif(action == "pause") then
           timer.pause(blockTimer)
           timer.pause(liveTimer)
-          timer.pause(ghostBallPowerupTimer)
-          timer.pause(checkForGhostBallPowerupTimer)
-          --timer.pause(cloudsTimer)
+          --timer.pause(ghostBallPowerupTimer)
+          --timer.pause(checkForGhostBallPowerupTimer)
      elseif(action == "resume") then
           timer.resume(blockTimer)
           timer.resume(liveTimer)
-          timer.resume(ghostBallPowerupTimer)
-          timer.resume(checkForGhostBallPowerupTimer)
-          --timer.resume(cloudsTimer)
+          --timer.resume(ghostBallPowerupTimer)
+          --timer.resume(checkForGhostBallPowerupTimer)
      end     
 end
 
 function moveMonester:accelerometer(e)
      --movement
      if(paused == false) then
-          ball.x = display.contentCenterX + (display.contentCenterX * (e.xGravity*3))
-          --ball.rotation = ball.x
-          ball.rotation = ball.x + e.xGravity + 9
+          --ball.x = display.contentCenterX + (display.contentCenterX * (e.xGravity*3))
+          ball.x = ball.x + (17 * e.xGravity)
+          --ball.y = ball.y - (35 * e.yGravity)
+          ball.rotation = ball.x + e.xGravity + 20
+          physics.setGravity( ( 9.8 * event.xGravity ), ( -9.8 * event.yGravity ) )
      end
 end
 
@@ -373,7 +389,7 @@ if(paused == false) then
      end
 
      if(ghostBallPowerupActive == false) then
-          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, isSensor = false, radius = 11})
+          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, friction = 2, isSensor = false, radius = 11})
      end
      if(ghostBallPowerupActive == true) then
                if(ball.y < (blocks[blocks.numChildren - 1].y - ball.height)) then
@@ -395,11 +411,13 @@ if(paused == false) then
 
      -- Screen Borders
      if(ball.x <= 0) then --Left
-          ball.x = 0 + (ball.width * 0.5)
-          --ball.x = display.contentWidth * 0.75
+          --ball.x = 5 + (ball.width * 0.5)
+          --ball.x = display.contentWidth * 0.25
+          ball.x = 0
      --elseif(ball.x >= (display.contentWidth - ball.width)) then --right
      elseif(ball.x >= (display.contentWidth)) then --right
-          ball.x = display.contentWidth - ball.width
+          ball.x = display.contentWidth
+          --ball.x = display.contentWidth - (ball.width * 2)
           --ball.x = 0
           --ball.x = display.contentWidth * 0.25
           --ball.x = display.contentWidth + (ball.width * 0.5)
@@ -428,18 +446,24 @@ if(paused == false) then
           moveSpeed = 0
           gameListeners("pause")
 
-          ball.x =  blocks[blocks.numChildren - 1].x
-          ball.y = blocks[blocks.numChildren - 1].y - ball.height
+
           --ball.y = ball.height + 5
           --ball.y = display.contentHeight * 0.25
 
           if(lives > 0) then
                timer.performWithDelay(1000, respawnTimer())
-               timer.performWithDelay(3000, respawn)
+               --timer.performWithDelay(3000, respawn)
           else
                respawn()
           end
-          
+
+          if(blocks[blocks.numChildren].name == "block")then
+          ball.x =  blocks[blocks.numChildren].x
+          ball.y = blocks[blocks.numChildren].y - ball.height
+          else
+          ball.x =  blocks[blocks.numChildren-1].x
+          ball.y = blocks[blocks.numChildren-1].y - ball.height
+          end
 
      elseif(ball.y > display.contentHeight) then --bottom
 
@@ -454,19 +478,24 @@ if(paused == false) then
           moveSpeed = 0
           gameListeners("pause")
           
-          ball.x =  blocks[blocks.numChildren - 1].x
-          ball.y = blocks[blocks.numChildren - 1].y - ball.height
+
           --ball.y = ball.height + 5
           --ball.y = display.contentHeight * 0.25
 
           if(lives > 0) then
                timer.performWithDelay(1000, respawnTimer())
-               respawnTimer = timer.performWithDelay(4000, respawn)
+               --respawnTimer = timer.performWithDelay(3000, respawn)
           else
                respawn()
           end
                
-          
+          if(blocks[blocks.numChildren].name == "block")then
+          ball.x =  blocks[blocks.numChildren].x
+          ball.y = blocks[blocks.numChildren].y - ball.height
+          else
+          ball.x =  blocks[blocks.numChildren-1].x
+          ball.y = blocks[blocks.numChildren-1].y - ball.height
+          end
      end
 
      --Check for game over
@@ -542,6 +571,7 @@ end
 
 function respawnTimerFour()
      respawnTF.text = " "
+     respawn()
 end
 
 function respawnTimerFive()
@@ -551,32 +581,33 @@ end
 
 function addBlock()
      --local r = math.floor(math.random() * 2)
-     local r = math.floor(math.random() * 4)
-     if(r ~= 0) then
+     --local r = math.floor(math.random(0, 3))
+     local r = math.random(0, 4)
+     if(r == 0 or r == 1 or r == 2 or r == 2.5 or r == 4) then
           local block = display.newImage("Block_new.png")
           block.name = "block"
           block.x = math.random() * (display.contentWidth - (block.width * 0.5))
-          if(block.x < 0) then
-               block.x = 5
+          if((block.x - (block.contentWidth * 0.5)) < 0) then
+               block.x = display.contentWidth * 0.25
           end
           if(block.x > display.contentWidth)then
                block.x = display.contentWidth - block.width
           end
           block.y = display.contentHeight + block.height
-          physics.addBody(block, {denisty = blockDenisty, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(block, {denisty = blockDenisty, friction = 0.4, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           block.bodyType = "static"
 
           blocks:insert(block)
-     else
+     elseif(r == 3) then
           local badBlock = display.newImage("badBlock.png")
           badBlock.name = "bad"
           
-          physics.addBody(badBlock, {denisty = 3, bounce = 0, isSensor = false, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(badBlock, {denisty = 6, friction = 0.4, bounce = 0.3, isSensor = false, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           badBlock.bodyType = "static"
           badBlock.x = math.random() * (display.contentWidth - (badBlock.width * 0.5))
 
-          if(badBlock.x < 0) then
-               badBlock.x = 5
+          if((badBlock.x - (badBlock.contentWidth * 0.5)) < 0) then
+               badBlock.x = display.contentWidth * 0.25
           end
           if(badBlock.x > display.contentWidth)then
                badBlock.x = display.contentWidth - badBlock.width
@@ -616,13 +647,13 @@ function  pauseButton(photo)
      end
 
      pauseButtonUI.x = 290
-     pauseButtonUI.y = 40
+     pauseButtonUI.y = 44
 end
 
 function  resetButton()
      resetButtonUI = display.newImage("ResetButton.png")
      resetButtonUI.x = 290
-     resetButtonUI.y = 110
+     resetButtonUI.y = 101
      resetButtonUI.xScale = 0.9
      resetButtonUI.yScale = 0.9
 end
@@ -684,8 +715,8 @@ function  resetButtonEffect()
      Runtime:removeEventListener("enterFrame", update)
      timer.cancel(blockTimer)
      timer.cancel(liveTimer)
-     timer.cancel(ghostBallPowerupTimer)
-     timer.cancel(checkForGhostBallPowerupTimer)
+     --timer.cancel(ghostBallPowerupTimer)
+     --timer.cancel(checkForGhostBallPowerupTimer)
      ball:removeEventListener("collision", collisionHandler)
      --
      --add Initial Blocks
@@ -694,10 +725,20 @@ function  resetButtonEffect()
      for i = 1, 3 do
           local InitialBlock = display.newImage("Block_new.png")
 
-          InitialBlock.x = math.floor(math.random() * (display.contentWidth - InitialBlock.width))
+          --InitialBlock.x = math.floor(math.random() * (display.contentWidth - InitialBlock.width))
+          --InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
+
+          InitialBlock.x = math.random() * (display.contentWidth - (InitialBlock.width * 0.5))
+          if((InitialBlock.x - (InitialBlock.contentWidth * 0.5)) < 0) then
+               InitialBlock.x = display.contentWidth * 0.25
+          end
+          if(InitialBlock.x > display.contentWidth)then
+               InitialBlock.x = display.contentWidth - InitialBlock.width
+          end
+          --block.x = math.random() * (display.contentWidth - (block.width * 0.5))
           InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
 
-          physics.addBody(InitialBlock, {denisty = blockDenisty, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 0.4, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           InitialBlock.bodyType = "static"
 
           blocks:insert(InitialBlock)
@@ -705,8 +746,8 @@ function  resetButtonEffect()
      --
      --add Ball
      ball = display.newImage("Ball.png")
-     ball.x = (display.contentWidth * 0.5)
-     ball.y = ball.height
+     ball.x =  blocks[1].x
+     ball.y = blocks[1].y - ball.height
      ball:setReferencePoint(display.CenterReferencePoint)
      ball.isBullet = true
      --
@@ -715,9 +756,9 @@ function  resetButtonEffect()
      Runtime:addEventListener("enterFrame", update)
 
      blockTimer = timer.performWithDelay(1000, addBlock, 0)
-     liveTimer = timer.performWithDelay(10000, addLivePowerup, 0)
-     ghostBallPowerupTimer = timer.performWithDelay(11000, ghostBallPowerup, 0)
-     checkForGhostBallPowerupTimer = timer.performWithDelay(10000, ghostBallPowerupEffect, 0)
+     liveTimer = timer.performWithDelay(6000, addLivePowerup, 0)
+     --ghostBallPowerupTimer = timer.performWithDelay(11000, ghostBallPowerup, 0)
+     --checkForGhostBallPowerupTimer = timer.performWithDelay(10000, ghostBallPowerupEffect, 0)
 
      ball:addEventListener("collision", collisionHandler)
      --
@@ -765,10 +806,20 @@ function showAlertPlayAgainIcon()
      for i = 1, 3 do
           local InitialBlock = display.newImage("Block_new.png")
 
-          InitialBlock.x = math.floor(math.random() * (display.contentWidth - InitialBlock.width))
+          --InitialBlock.x = math.floor(math.random() * (display.contentWidth - InitialBlock.width))
+          --InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
+
+          InitialBlock.x = math.random() * (display.contentWidth - (InitialBlock.width * 0.5))
+          if((InitialBlock.x - (InitialBlock.contentWidth * 0.5)) < 0) then
+               InitialBlock.x = display.contentWidth * 0.25
+          end
+          if(InitialBlock.x > display.contentWidth)then
+               InitialBlock.x = display.contentWidth - InitialBlock.width
+          end
+          --block.x = math.random() * (display.contentWidth - (block.width * 0.5))
           InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
 
-          physics.addBody(InitialBlock, {denisty = blockDenisty, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 0.4, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           InitialBlock.bodyType = "static"
 
           blocks:insert(InitialBlock)
@@ -776,8 +827,8 @@ function showAlertPlayAgainIcon()
      --
      --add Ball
      ball = display.newImage("Ball.png")
-     ball.x = (display.contentWidth * 0.5)
-     ball.y = ball.height
+     ball.x =  blocks[1].x
+     ball.y = blocks[1].y - ball.height
      ball:setReferencePoint(display.CenterReferencePoint)
      ball.isBullet = true
      --
@@ -790,7 +841,7 @@ function showAlert()
      gameListeners("rmv")
      alert = display.newImage("alertBg.png", 70, 190)
 
-     alertScore = display.newText(scoreTF.text .. "!", 134, 240, native.systemFontBold, 30)
+     alertScore = display.newText(scoreTF.text .. "!", 134, 240, "PizzaDudesHandwriting", 30)
      --livesTF.text = ""
 
      display.remove(ball)
@@ -847,7 +898,7 @@ function backToMainMenu()
 end
 
 function addLivePowerup()
-     if(ball.y < (display.contentHeight * 0.33)) then
+     if(ball.y < (blocks[blocks.numChildren - 1].y)) then
           live = display.newImage("live.png")
 
           live.name = "live"
@@ -863,13 +914,13 @@ function addLivePowerup()
 end
 
 function ghostBallPowerup()
-     if(ball.y < (display.contentHeight * 0.33)) then
+     if(ball.y < (blocks[blocks.numChildren].y)) then
           ghostBall = display.newImage("ghost.png")
 
           ghostBall.name = "ghostBallPowerup"
 
-          ghostBall.x = blocks[blocks.numChildren - 1].x + 0.8
-          ghostBall.y = blocks[blocks.numChildren - 1].y - ghostBall.height
+          ghostBall.x = blocks[blocks.numChildren].x + 0.8
+          ghostBall.y = blocks[blocks.numChildren].y - ghostBall.height
           if(ghostBall.y < -5) then --at top, will fall
                ghostBall.y = ghostBall.y - 20
           end
@@ -901,15 +952,19 @@ end
 
 function collisionHandler(e)
      if(e.other.name == "bad") then
+          audio.play(ballSound)
           isBadBlock = true
           thisBadBlock = e.other
+     end
 
+     if(e.other.name == "block") then
+          audio.play(ballSound)
      end
 
      --Lives Powerup
      if(e.other.name == "live") then
           display.remove(e.other)
-          e.other = nil
+          --e.other = nil
           if(lives < 3 and lives > 0) then
                lives = lives + 1
                livesTF.text = 'x' .. lives
@@ -919,7 +974,7 @@ function collisionHandler(e)
      --ghostBallPowerup
      if(e.other.name == "ghostBallPowerup") then
           display.remove(e.other)
-          e.other = nil
+          --e.other = nil
           if(live) then
                display.remove(live)
           end
