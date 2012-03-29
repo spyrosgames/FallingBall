@@ -46,9 +46,9 @@ local ball
 local anotherBall
 local ghostBall
 
-local ballDenisty = 4
+local ballDenisty = 1
 local blockDenisty = 1
-local ballBouncing = 0.1
+local ballBouncing = 0
 
 local gameView
 
@@ -151,7 +151,7 @@ local windPositionBeforeRespawn
 
 function Main()
      display.setStatusBar(display.HiddenStatusBar)
-     system.setAccelerometerInterval(40)
+     system.setAccelerometerInterval(35)
      physics.setScale(60)
      addTitleView()
 
@@ -364,7 +364,7 @@ function moveMonester:accelerometer(e)
      --movement
      if(paused == false) then
           --ball.x = display.contentCenterX + (display.contentCenterX * (e.xGravity*3))
-          ball.x = ball.x + (18 * e.xGravity)
+          ball.x = ball.x + (20 * e.xGravity)
           --ball.y = ball.y - (35 * e.yGravity)
           ball.rotation = ball.x + (e.xGravity * 40)
           physics.setGravity( ( 9.8 * event.xGravity ), ( -9.8 * event.yGravity ) )
@@ -806,7 +806,7 @@ function  resetButtonEffect()
 
      for i = 1, 3 do
           local InitialBlock = display.newImage("Block_new.png")
-
+          InitialBlock.name = "block"
           --InitialBlock.x = math.floor(math.random() * (display.contentWidth - InitialBlock.width))
           --InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
 
@@ -820,7 +820,7 @@ function  resetButtonEffect()
           --block.x = math.random() * (display.contentWidth - (block.width * 0.5))
           InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
 
-          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 7, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 10, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           InitialBlock.bodyType = "static"
 
           blocks:insert(InitialBlock)
@@ -888,6 +888,7 @@ function showAlertPlayAgainIcon()
 
      for i = 1, 3 do
           local InitialBlock = display.newImage("Block_new.png")
+          InitialBlock.name = "block"
 
           --InitialBlock.x = math.floor(math.random() * (display.contentWidth - InitialBlock.width))
           --InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
