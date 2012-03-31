@@ -45,8 +45,9 @@ local monester
 local ball
 local anotherBall
 local ghostBall
+local slowDown
 
-local ballDenisty = 1
+local ballDenisty = 2
 local blockDenisty = 1
 local ballBouncing = 0
 
@@ -100,6 +101,7 @@ local moveAnotherBall = {}
 local addBlock = {}
 local addLivePowerup = {}
 local ghostBallPowerup = {}
+local slowDownPowerup = {}
 local gameListeners = {}
 local update = {}
 local collisionHandler = {}
@@ -292,7 +294,7 @@ function addInitialBlocks(n)
           block.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
           --block.y = display.contentHeight + block.height
 
-          physics.addBody(block, {denisty = blockDenisty, friction = 20, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(block, {denisty = blockDenisty, friction = 20, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           block.bodyType = "static"
 
           blocks:insert(block)
@@ -318,7 +320,7 @@ function gameListeners(action)
      if(action == "add") then
           Runtime:addEventListener("accelerometer", moveMonester)
           Runtime:addEventListener("enterFrame", update)
-          blockTimer = timer.performWithDelay(1000, addBlock, 0)
+          blockTimer = timer.performWithDelay(770, addBlock, 0)
           liveTimer = timer.performWithDelay(6000, addLivePowerup, 0)
           checkForLivePowerupPositionTimer = timer.performWithDelay(1000, checkForLivePowerupPosition, 0)
           --ghostBallPowerupTimer = timer.performWithDelay(11000, ghostBallPowerup, 0)
@@ -416,7 +418,7 @@ if(paused == false) then
      end
 
      if(ghostBallPowerupActive == false) then
-          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, friction = 20, isSensor = false, radius = 11})
+          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, friction = 15, isSensor = false, radius = 11})
      end
      if(ghostBallPowerupActive == true) then
                if(ball.y < (blocks[blocks.numChildren - 1].y - ball.height)) then
@@ -614,7 +616,7 @@ function addBlock()
      --local r = math.floor(math.random() * 2)
      --local r = math.floor(math.random(0, 3))
      local r = math.random(0, 6)
-     if(r >=0 and r <= 5) then
+     if(r ~= 4) then
           local block = display.newImage("Block_new.png")
           block.name = "block"
           block.x = math.random() * (display.contentWidth - (block.width * 0.5))
@@ -625,15 +627,15 @@ function addBlock()
                block.x = display.contentWidth - block.width
           end
           block.y = display.contentHeight + block.height
-          physics.addBody(block, {denisty = blockDenisty, friction = 20, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(block, {denisty = blockDenisty, friction = 20, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           block.bodyType = "static"
 
           blocks:insert(block)
-     elseif(r == 6) then
+     elseif(r == 4) then
           local badBlock = display.newImage("badBlock.png")
           badBlock.name = "bad"
           
-          physics.addBody(badBlock, {denisty = 6, friction = 20, bounce = 0.3, isSensor = false, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(badBlock, {denisty = 6, friction = 20, bounce = 0, isSensor = false, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           badBlock.bodyType = "static"
           badBlock.x = math.random() * (display.contentWidth - (badBlock.width * 0.5))
 
@@ -820,7 +822,7 @@ function  resetButtonEffect()
           --block.x = math.random() * (display.contentWidth - (block.width * 0.5))
           InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
 
-          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 10, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 20, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           InitialBlock.bodyType = "static"
 
           blocks:insert(InitialBlock)
@@ -903,7 +905,7 @@ function showAlertPlayAgainIcon()
           --block.x = math.random() * (display.contentWidth - (block.width * 0.5))
           InitialBlock.y = (display.contentHeight * 0.5) + math.floor(math.random() * (display.contentHeight * 0.5))
 
-          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 20, bounce = 0.3, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
+          physics.addBody(InitialBlock, {denisty = blockDenisty, friction = 20, bounce = 0, shape = {-26, -7, 26, -7, 26, 7, -26, 7}})
           InitialBlock.bodyType = "static"
 
           blocks:insert(InitialBlock)
@@ -1024,6 +1026,20 @@ function ghostBallPowerup()
           if(live and live.y == ghostBall.y) then
                display.removeBody(ghostBall)
           end
+     end
+end
+
+function slowDownPowerup()
+     if(ball.y < (blocks[blocks.numChildren - 1].y)) then
+          slowDown = display.newImage("slowDown.png")
+
+          slowDown.name = "slowDown"
+          slowDown.x = blocks[blocks.numChildren - 1].x
+          slowDown.y = blocks[blocks.numChildren - 1].y - slowDown.height
+
+          slowDown.bodyType = "kinematic"
+          slowDown.isFixedRotation = true
+          physics.addBody(live, {denisty = 1, friction = 20, bounce = 0})
      end
 end
 
