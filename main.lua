@@ -30,12 +30,13 @@ local creditsView
 local credits
 local website
 local backFromCreditsButton
-
+local GameTitle
 --Powerups Stuff--
 local live
 local ghostBall
 local slowDown
-
+local glue
+local powerup
 --HUDs--
 local livesTF
 local lives = 3
@@ -63,16 +64,17 @@ local alert
 local playAgainIcon
 local facebookIcon
 local backToMainMenuIcon
-
+local powerupCelebration
 --GameView Physics--
 local ballDenisty = 2
 local blockDenisty = 1
 local ballBouncing = 0
-
+local ballFriction = 15
 --Game Controllers
 local moveSpeed = 2
 local moveSpeedWhenSlowDownPowerupTaken
 local moveSpeedWhenGhostBallPowerupTaken
+
 local beforePauseMoveSpeed
 
 local respawning = false
@@ -80,6 +82,8 @@ local muted = false
 local livePowerUpStarted = false
 local slowDownPowerupActive = false
 local ghostBallPowerupActive = false
+local livePowerupActive = false
+local gluePowerupActive = false
 local ghostBallPowerupStartTime = 0
 local paused = false
 local isFlying = false
@@ -90,6 +94,10 @@ local isAlertShown = false
 local cloudPositionBeforeRespawn
 local windPositionBeforeRespawn
 
+local livePowerupTaken = false
+local slowDownPowerupTaken = false
+local gluePowerupTaken = false
+
 --Timers--
 local blockTimer
 local liveTimer
@@ -99,6 +107,8 @@ local cloudsTimer
 local checkForLivePowerupPositionTimer
 local slowDownPowerupTimer
 local checkForSlowDownPowerupTimer
+local gluePowerupTimer
+local checkForGluePowerupTimer
 
 local respawnTimer
 local afterRespawnTimer
@@ -138,6 +148,7 @@ local moveClouds = {}
 local resetWind = {}
 local resetCloud = {}
 
+local removePowerupCelebration = {}
 --Game Controllers--
 local gameListeners = {}
 local update = {}
@@ -159,14 +170,19 @@ local respawnTimerFive = {}
 local addLivePowerup = {}
 local ghostBallPowerup = {}
 local slowDownPowerup = {}
+local gluePowerup = {}
 
 local ghostBallPowerupEffect = {}
 local slowDownPowerupEffect = {}
+local gluePowerupEffect = {}
 
 local disableGhostBallPowerupEffect = {}
 local disableSlowDownPowerupEffect = {}
+local disableGluePowerupEffect = {}
 
 local checkForLivePowerupPosition = {}
+
+local removePowerup = {}
 --
 local sprite = require('sprite')
 local spriteSheet = sprite.newSpriteSheet("BackgroundSpriteSheet.png", 320, 193)
@@ -185,8 +201,8 @@ function Main()
 
      openfeint.init("vEIQcyk6tNGeHGrJLFFA", "WAQEekVOmhYJOLewycV9aaBtiiocikAj57MM4SpDe4", "Falling Ball")
 
-     --local sysFonts = native.getFontNames()
-     --for k,v in pairs(sysFonts) do print(v) end
+     local sysFonts = native.getFontNames()
+     for k,v in pairs(sysFonts) do print(v) end
 end
 
 --Game UI Elements--
@@ -222,13 +238,18 @@ function addTitleView()
      background.y = 390
 
      title = display.newImage("mainMenu.png")
+     
+     GameTitle = display.newImage("GameTitle.png")
+     GameTitle.x = display.contentCenterX + 67
+     GameTitle.y = display.contentCenterY - 100
+     GameTitle.rotation = -30
 
      startButton = display.newImage("startBtn.png")
      startButton.x = display.contentCenterX - 72
      startButton.y = display.contentCenterY - 60
      startButton.name = "StartButton"
-     startButton.xScale = 0.9
-     startButton.yScale = 0.9
+     startButton.xScale = 1
+     startButton.yScale = 1
 
      creditsButton = display.newImage("creditsBtn.png")
      creditsButton.x = display.contentCenterX + 89
@@ -250,7 +271,7 @@ function addTitleView()
      titleView:insert(startButton)
      titleView:insert(creditsButton)
      titleView:insert(highscoresButton)
-
+     titleView:insert(GameTitle)
      initialListeners("add")
 end
 
@@ -277,18 +298,18 @@ function gameView()
      --HUDs
      --Score
      scoreHUD = display.newImage("hudforscore.png")
-     scoreHUD.x = 287
-     scoreHUD.y = 210
+     scoreHUD.x = 33
+     scoreHUD.y = 40
      --Lives
      livesHUD = display.newImage("hudforlives.png")
-     livesHUD.x = 290
-     livesHUD.y = 261
+     livesHUD.x = 33
+     livesHUD.y = 90
      --
      --Score Text
-     scoreTF = display.newText('0', 285, 200, native.systemFont, 12)
+     scoreTF = display.newText('0', 28, 30, "Desyrel", 16)
      scoreTF:setTextColor(255, 255, 255)
      --Lives Text
-     livesTF = display.newText('x3', 283, 253, native.systemFont, 12)
+     livesTF = display.newText('x3', 27.5, 80, "Desyrel", 15)
      livesTF:setTextColor(0, 0, 0)
 
      --respawnTF.size = 70
@@ -343,9 +364,11 @@ function gameListeners(action)
           Runtime:addEventListener("enterFrame", update)
           blockTimer = timer.performWithDelay(770, addBlock, 0)
           liveTimer = timer.performWithDelay(6000, addLivePowerup, 0)
-          checkForLivePowerupPositionTimer = timer.performWithDelay(1000, checkForLivePowerupPosition, 0)
-          slowDownPowerupTimer = timer.performWithDelay(12000, slowDownPowerup,0)
-          checkForSlowDownPowerupTimer = timer.performWithDelay(24000, slowDownPowerupEffect, 0)
+          --checkForLivePowerupPositionTimer = timer.performWithDelay(8000, checkForLivePowerupPosition, 0)
+          --slowDownPowerupTimer = timer.performWithDelay(8000, slowDownPowerup,0)
+          --gluePowerupTimer = timer.performWithDelay(10000, gluePowerup, 0)
+          --checkForSlowDownPowerupTimer = timer.performWithDelay(24000, slowDownPowerupEffect, 0)
+          
           --ghostBallPowerupTimer = timer.performWithDelay(11000, ghostBallPowerup, 0)
           --checkForGhostBallPowerupTimer = timer.performWithDelay(10000, ghostBallPowerupEffect, 0)
           ball:addEventListener("collision", collisionHandler)
@@ -357,9 +380,10 @@ function gameListeners(action)
           Runtime:removeEventListener("enterFrame", update)
           timer.cancel(blockTimer)
           timer.cancel(liveTimer)
-          timer.cancel(checkForLivePowerupPositionTimer)
-          timer.cancel(slowDownPowerupTimer)
-          timer.cancel(checkForSlowDownPowerupTimer)
+          --timer.cancel(checkForLivePowerupPositionTimer)
+          --timer.cancel(slowDownPowerupTimer)
+          --timer.cancel(gluePowerupTimer)
+          --timer.cancel(checkForSlowDownPowerupTimer)
           --timer.cancel(ghostBallPowerupTimer)
           --timer.cancel(checkForGhostBallPowerupTimer)
 
@@ -375,17 +399,19 @@ function gameListeners(action)
      elseif(action == "pause") then
           timer.pause(blockTimer)
           timer.pause(liveTimer)
-          timer.pause(checkForLivePowerupPositionTimer)
-          timer.pause(slowDownPowerupTimer)
-          timer.pause(checkForSlowDownPowerupTimer)
+          --timer.pause(checkForLivePowerupPositionTimer)
+          --timer.pause(slowDownPowerupTimer)
+          --timer.pause(gluePowerupTimer)
+          --timer.pause(checkForSlowDownPowerupTimer)
           --timer.pause(ghostBallPowerupTimer)
           --timer.pause(checkForGhostBallPowerupTimer)
      elseif(action == "resume") then
           timer.resume(blockTimer)
           timer.resume(liveTimer)
-          timer.resume(checkForLivePowerupPositionTimer)
-          timer.resume(slowDownPowerupTimer)
-          timer.resume(checkForSlowDownPowerupTimer)
+          --timer.resume(checkForLivePowerupPositionTimer)
+          --timer.resume(slowDownPowerupTimer)
+          --timer.resume(gluePowerupTimer)
+          --timer.resume(checkForSlowDownPowerupTimer)
           --timer.resume(ghostBallPowerupTimer)
           --timer.resume(checkForGhostBallPowerupTimer)
      end     
@@ -397,7 +423,7 @@ function moveMonester:accelerometer(e)
           --ball.x = display.contentCenterX + (display.contentCenterX * (e.xGravity*3))
           ball.x = ball.x + (20 * e.xGravity)
           --ball.y = ball.y - (35 * e.yGravity)
-          ball.rotation = ball.x + (e.xGravity * 40)
+          ball.rotation = ball.x + (e.xGravity * 80)
           physics.setGravity( ( 9.8 * event.xGravity ), ( -9.8 * event.yGravity ) )
      end
 end
@@ -421,19 +447,55 @@ function  resetWind()
           wind.x = 0
      end
 end
+
 function update(e)
 if(paused == false) then
-     --[[
-     if(livePowerUpStarted == true)then
-     if(live.y < -5) then --at top, will fall
-          live.x = blocks[blocks.numChildren - 1].x
-          live.y = blocks[blocks.numChildren - 1].y - live.height
-          --display.remove(live)
-          livePowerUpStarted = false
+     --Levels
+     if(slowDownPowerupActive == false)then
+     if(score < 500) then
+     --Player Movement
+          moveSpeed = 2.2
      end
-     
+
+     if(score > 500 and score < 502) then
+          moveSpeed = 3.3
      end
-     --]]
+
+     if(score > 1000 and score < 1002) then
+          moveSpeed = 4
+     end
+
+     if(score > 2000 and score < 2002) then
+          moveSpeed = 5
+     end
+
+     if(score > 3000 and score < 3002) then
+          moveSpeed = 6
+     end
+
+     if(score > 4000 and score < 4002) then
+          moveSpeed = 7
+     end
+
+     if(score > 4000 and score < 4002) then
+          moveSpeed = 8
+     end
+     end
+
+     if(livePowerupActive == true)then
+          livePowerupActive = false
+     end
+
+     if(slowDownPowerupActive == true)then
+          moveSpeed = 2
+          timer.performWithDelay(4000, disableSlowDownPowerupEffect)
+     end
+
+     if(gluePowerupActive == true)then
+          ballFriction = 50
+          timer.performWithDelay(4000, disableGluePowerupEffect)
+     end
+
      if(cloud.x > (-cloud.width)) then
           transition.from(cloud, {time = 500, x = cloud.x - 0.2 , transition = easing.outQuad})
      else
@@ -441,13 +503,13 @@ if(paused == false) then
      end
 
      if(wind.x < (display.contentWidth + (wind.width) )) then
-          transition.from(wind, {time = 500, x = wind.x + 0.4 , transition = easing.outQuad})
+          transition.from(wind, {time = 500, x = wind.x + 0.8 , transition = easing.outQuad})
      else
           transition.from(wind, {time = 500, x = -(wind.width) , transition = easing.outQuad})     
      end
 
      if(ghostBallPowerupActive == false) then
-          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, friction = 15, isSensor = false, radius = 11})
+          physics.addBody(ball, {denisty = ballDenisty, bounce = ballBouncing, friction = ballFriction, isSensor = false, radius = 11})
      end
 
      if(ghostBallPowerupActive == true) then
@@ -465,14 +527,6 @@ if(paused == false) then
           isBadBlock = false
      end
 
-     if(slowDownPowerupActive == true)then
-          moveSpeed = 2
-          ball.y = ball.y + moveSpeed
-     end
-     --if(ball.y > display.contentHeight) then
-          --ball.y = display.contentHeight
-     --end
-
      -- Screen Borders
      if(ball.x <= 0) then --Left
           --ball.x = 5 + (ball.width * 0.5)
@@ -486,7 +540,7 @@ if(paused == false) then
           --ball.x = display.contentWidth * 0.25
           --ball.x = display.contentWidth + (ball.width * 0.5)
      end
-     
+
      for i = 1, blocks.numChildren do
           --Blocks Movement
           blocks[i].y = blocks[i].y - moveSpeed
@@ -528,7 +582,6 @@ if(paused == false) then
           ball.x =  blocks[blocks.numChildren-1].x
           ball.y = blocks[blocks.numChildren-1].y - ball.height
           end
-
      elseif(ball.y > display.contentHeight) then --bottom
 
           respawning = true
@@ -564,47 +617,11 @@ if(paused == false) then
 
      --Check for game over
      if(lives == 0) then
-          firstBallDead = true
           showAlert()
      end
 
-     --Levels
-     if(slowDownPowerupActive == false)then
-     if(score < 500) then
-          --Player Movement
-          ball.y = ball.y + moveSpeed
-     end
-
-     if(score > 500 and score < 502) then
-          moveSpeed = 3
-          ball.y = ball.y + moveSpeed
-     end
-
-     if(score > 1000 and score < 1002) then
-          moveSpeed = 4
-          ball.y = ball.y + moveSpeed
-     end
-
-     if(score > 2000 and score < 2002) then
-          moveSpeed = 5
-          ball.y = ball.y + moveSpeed
-     end
-
-     if(score > 3000 and score < 3002) then
-          moveSpeed = 6
-          ball.y = ball.y + moveSpeed
-     end
-
-     if(score > 4000 and score < 4002) then
-          moveSpeed = 7
-          ball.y = ball.y + moveSpeed
-     end
-
-     if(score > 4000 and score < 4002) then
-          moveSpeed = 8
-          ball.y = ball.y + moveSpeed
-     end 
-     end
+     --Ball
+     ball.y = ball.y + moveSpeed
 end
 end
 
@@ -621,7 +638,7 @@ end
 function respawnTimer()
      --respawnTF.text = "3"
      --Respawn Text
-     respawnTF = display.newText('3', display.contentWidth * 0.5, display.contentHeight * 0.4, native.systemFont, 70)
+     respawnTF = display.newText('3', display.contentWidth * 0.5, display.contentHeight * 0.4, "Desyrel", 70)
      respawnTF:setTextColor(255, 255, 255)
 
      timer.performWithDelay(1000, respawnTimerTwo)
@@ -813,7 +830,7 @@ function  resetButtonEffect()
 
      display.remove(blocks)
      display.remove(ball)
-     display.remove(live)
+     display.remove(powerup)
      --display.remove(ghostBall)
 
      cloud.x = display.contentWidth
@@ -830,14 +847,17 @@ function  resetButtonEffect()
 
      moveSpeed = 2
      livePowerUpStarted = false
+     slowDownPowerupActive = false
+     gluePowerupActive = false
      --
      --remove Listeners
      Runtime:removeEventListener("enterFrame", update)
      timer.cancel(blockTimer)
      timer.cancel(liveTimer)
-     timer.cancel(checkForLivePowerupPositionTimer)
-     timer.cancel(slowDownPowerupTimer)
-     timer.cancel(checkForSlowDownPowerupTimer)
+     --timer.cancel(checkForLivePowerupPositionTimer)
+     --timer.cancel(slowDownPowerupTimer)
+     --timer.cancel(gluePowerupTimer)
+     --timer.cancel(checkForSlowDownPowerupTimer)
      --timer.cancel(ghostBallPowerupTimer)
      --timer.cancel(checkForGhostBallPowerupTimer)
      ball:removeEventListener("collision", collisionHandler)
@@ -878,12 +898,11 @@ function  resetButtonEffect()
      --add gameListeners
      Runtime:addEventListener("enterFrame", update)
 
-     blockTimer = timer.performWithDelay(1000, addBlock, 0)
+     blockTimer = timer.performWithDelay(770, addBlock, 0)
      liveTimer = timer.performWithDelay(6000, addLivePowerup, 0)
-     checkForLivePowerupPositionTimer = timer.performWithDelay(1000, checkForLivePowerupPosition, 0)
-     slowDownPowerupTimer = timer.performWithDelay(12000, slowDownPowerup,0)
-     checkForSlowDownPowerupTimer = timer.performWithDelay(24000, slowDownPowerupEffect, 0)
-
+     --checkForLivePowerupPositionTimer = timer.performWithDelay(8000, checkForLivePowerupPosition, 0)
+     --slowDownPowerupTimer = timer.performWithDelay(24000, slowDownPowerup,0)
+     --gluePowerupTimer = timer.performWithDelay(18000, gluePowerup, 0)
      --ghostBallPowerupTimer = timer.performWithDelay(11000, ghostBallPowerup, 0)
      --checkForGhostBallPowerupTimer = timer.performWithDelay(10000, ghostBallPowerupEffect, 0)
 
@@ -903,7 +922,7 @@ function showAlertPlayAgainIcon()
 
      display.remove(blocks)
      display.remove(ball)
-     display.remove(live)
+     display.remove(powerup)
      --display.remove(ghostBall)
      display.remove(alert)
      display.remove(alertScore)
@@ -925,6 +944,8 @@ function showAlertPlayAgainIcon()
 
      moveSpeed = 2
      livePowerUpStarted = false
+     slowDownPowerupActive = false
+     gluePowerupActive = false
 
      resetButton()
 
@@ -962,7 +983,6 @@ function showAlertPlayAgainIcon()
      ball.isBullet = true
      --
      gameListeners("add")
-
 end
 
 function showAlert()
@@ -970,14 +990,13 @@ function showAlert()
      gameListeners("rmv")
      alert = display.newImage("alertBg.png", 70, 190)
 
-     alertScore = display.newText(scoreTF.text .. "!", 134, 240, native.systemFont, 30)
+     alertScore = display.newText(scoreTF.text .. "!", 134, 240, "Desyrel", 30)
      --livesTF.text = ""
      --live = nil
 
      display.remove(ball)
-     display.remove(live)
+     display.remove(powerup)
      --display.remove(ghostBall)
-     
 
      display.remove(resetButtonUI)
      transition.from(alert, {time = 200, xScale = 0.8})
@@ -1041,17 +1060,47 @@ end
 
 function addLivePowerup()
      if(ball.y < (blocks[blocks.numChildren - 1].y)) then
-          live = display.newImage("live.png")
+          local powerupsArray = {}
+          local randomPowerup = math.random(0, 2)
+          
+          if(randomPowerup == 0) then
+               live = display.newImage("live.png")
+               live.name = "live"
+               live.bodyType = "kinematic"
+               live.isFixedRotation = true
+               physics.addBody(live, {denisty = 1, friction = 20, bounce = 0})
+               powerup = live
+               timer.performWithDelay(8000, removePowerup)
+          end
+          
+          if(randomPowerup == 1) then
+               slowDown = display.newImage("slowDown.png")
+               slowDown.name = "slowDown"
+               slowDown.bodyType = "kinematic"
+               slowDown.isFixedRotation = true
+               physics.addBody(slowDown, {denisty = 1, friction = 20, bounce = 0})
+               powerup = slowDown
+               timer.performWithDelay(8000, removePowerup)
+          end
 
-          live.name = "live"
-          live.x = blocks[blocks.numChildren - 1].x
-          live.y = blocks[blocks.numChildren - 1].y - live.height
+          if(randomPowerup == 2) then
+               glue = display.newImage("glue.png")
+               glue.name = "glue"
+               glue.bodyType = "kinematic"
+               glue.isFixedRotation = true
+               physics.addBody(glue, {denisty = 1, friction = 20, bounce = 0})
+               powerup = glue
+               timer.performWithDelay(8000, removePowerup)
+          end
+          powerup.x = blocks[blocks.numChildren - 1].x
+          powerup.y = blocks[blocks.numChildren - 1].y - powerup.height
 
-          live.bodyType = "kinematic"
-          live.isFixedRotation = true
-          physics.addBody(live, {denisty = 1, friction = 20, bounce = 0})
           livePowerUpStarted = true
      end
+end
+
+function removePowerup()
+     display.remove(powerup)
 end
 
 function ghostBallPowerup()
@@ -1088,7 +1137,7 @@ function disableGhostBallPowerupEffect()
 end
 
 function slowDownPowerup()
-     if(ball.y < (blocks[blocks.numChildren - 1].y)) then
+     if(ball.y < (blocks[blocks.numChildren - 2].y)) then
           slowDown = display.newImage("slowDown.png")
 
           slowDown.name = "slowDown"
@@ -1113,15 +1162,33 @@ function slowDownPowerup()
      end
 end
 
-function slowDownPowerupEffect()
-     if(slowDownPowerupActive == true)then
-          timer.performWithDelay(2000, disableSlowDownPowerupEffect(), 0)
-     end
-end
-
 function  disableSlowDownPowerupEffect()
      slowDownPowerupActive = false
      moveSpeed = moveSpeedWhenSlowDownPowerupTaken
+end
+
+function gluePowerup()
+     if(ball.y < (blocks[blocks.numChildren - 1].y)) then
+          glue = display.newImage("glue.png")
+
+          glue.name = "glue"
+          
+          glue.y = blocks[blocks.numChildren - 1].y - glue.height
+          glue.x = blocks[blocks.numChildren - 1].x
+          
+          glue.bodyType = "kinematic"
+          glue.isFixedRotation = true
+          physics.addBody(glue, {denisty = 1, friction = 20, bounce = 0})
+     end
+end
+
+function  disableGluePowerupEffect()
+     gluePowerupActive = false
+     ballFriction = 15
+end
+
+function  removePowerupCelebration()
+     display.remove(powerupCelebration) 
 end
 
 function collisionHandler(e)
@@ -1142,6 +1209,8 @@ function collisionHandler(e)
      --Lives Powerup
      if(e.other.name == "live") then
           display.remove(e.other)
+          livePowerupActive = true
+          livePowerupTaken = true
           --e.other = nil
           if(lives < 3 and lives > 0) then
                lives = lives + 1
@@ -1162,8 +1231,16 @@ function collisionHandler(e)
      if(e.other.name == "slowDown") then
           display.remove(e.other)
           slowDownPowerupActive = true
+          slowDownPowerupTaken = true
           moveSpeedWhenSlowDownPowerupTaken = moveSpeed
-     end      
+     end
+
+     --Glue Powerup
+     if(e.other.name == "glue") then
+          display.remove(e.other)
+          gluePowerupActive = true
+          gluePowerupTaken = true
+     end     
 end
 
 function removeBadBlock(e)
